@@ -2,10 +2,14 @@ import idx2numpy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import accuracy_score, multilabel_confusion_matrix
+
+from tensorflow import keras
+from tensorflow.keras import layers
 
 # ---------------------------------
 # IMPORT MNIST DATASET
@@ -24,12 +28,11 @@ y = labelarray
 # PREPARE & SPLIT DATASETS
 # ---------------------------------
 
+# Reshape 3D to 2D
+X = X.reshape((len(X), 28*28), order='F')
+
 # Train test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
-
-# Reshape 3D to 2D
-X_train = X_train.reshape((len(X_train), 28*28), order='F')
-X_test = X_test.reshape((len(X_test), 28*28), order='F')
 
 # ---------------------------------
 # SIMPLE SVM BASELINE
@@ -42,5 +45,58 @@ preds = model.predict(X_test)
 acc = accuracy_score(y_test, preds)
 mcm = multilabel_confusion_matrix(y_test, preds)
 
-print(mcm.mean(axis=0))
-print(acc)
+print("\nSVM BASELINE")
+print(f"Accuracy: {acc}")
+
+# ---------------------------------
+# SIMPLE NEURAL NET BASELINE
+# ---------------------------------
+
+# Input shape & random state
+tf.random.set_seed(0)
+_, input_shape = X_train.shape
+
+# Build model
+model = keras.Sequential([
+                          keras.Input(shape=(input_shape,)),
+                          layers.Dense(128, activation='relu'),
+                          layers.Dense(128, activation='relu'),
+                          layers.Dense(10, activation="softmax"),
+                          ])
+
+# Compile model
+model.compile(
+             optimizer="rmsprop",
+             loss="sparse_categorical_crossentropy",
+             metrics=["sparse_categorical_accuracy"],
+             )
+
+# Set early stopping
+early_stop = [keras.callbacks.EarlyStopping(
+                    monitor="val_loss",
+                    min_delta=1e-2,
+                    patience=3,
+                    verbose=1,
+                    )]
+    
+# Train model
+history = model.fit(
+                    X_train,
+                    y_train,
+                    batch_size=64,
+                    epochs=30,
+                    callbacks=early_stop,
+                    validation_split=0.2,
+                    )
+
+# Test model
+preds = model.predict(X_test)
+
+# Convert softmax probabilities to integers
+preds = np.argmax(preds,axis=-1)
+
+acc = accuracy_score(y_test, preds)
+mcm = multilabel_confusion_matrix(y_test, preds)
+
+print("\nNEURAL NET BASELINE")
+print(f"Accuracy: {acc}")
