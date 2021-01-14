@@ -1,0 +1,7 @@
+pandas
+numpy
+tensorflow
+sklearn
+idx2numpy
+matplotlib
+jupyter
